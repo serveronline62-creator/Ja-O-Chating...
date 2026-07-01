@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>💬 WA + Suara Masuk & Kirim</title>
+    <title>💬 WA + Suara Siulan</title>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js">
@@ -586,11 +586,10 @@
         const menuUnsend = document.getElementById('menuUnsend');
 
         // ============================================================
-        // 3. SUARA (Web Audio)
+        // 3. SUARA (Web Audio) - Suara Siulan untuk pesan masuk
         // ============================================================
         let audioCtx = null;
 
-        // Inisialisasi audio context (harus dipanggil setelah interaksi user)
         function initAudio() {
             if (!audioCtx) {
                 try {
@@ -599,30 +598,44 @@
                     console.warn('Web Audio tidak didukung');
                 }
             }
-            // Resume jika suspend
             if (audioCtx && audioCtx.state === 'suspended') {
                 audioCtx.resume().catch(() => {});
             }
         }
 
-        // Suara untuk pesan masuk (nada tinggi, durasi 0.15s)
+        // Suara siulan untuk pesan masuk
         function playIncomingSound() {
             try {
                 initAudio();
                 if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
+
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-                osc.frequency.value = 800;
+
+                // Frekuensi: mulai dari 1000Hz, naik ke 1500Hz, lalu turun ke 1200Hz, lalu naik ke 1400Hz
+                // Memberi efek siulan yang meliuk
+                osc.frequency.setValueAtTime(1000, now);
+                osc.frequency.linearRampToValueAtTime(1500, now + 0.08);
+                osc.frequency.linearRampToValueAtTime(1200, now + 0.16);
+                osc.frequency.linearRampToValueAtTime(1400, now + 0.24);
+
                 osc.type = 'sine';
-                const now = audioCtx.currentTime;
-                gain.gain.setValueAtTime(0.15, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                // Envelope volume
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+                gain.gain.linearRampToValueAtTime(0.12, now + 0.15);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+
                 osc.start(now);
-                osc.stop(now + 0.15);
+                osc.stop(now + 0.3);
+
             } catch (e) {
-                // Fallback
+                // Fallback ke suara sederhana
                 try {
                     const audio = new Audio('data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAABCAAAAAAA=');
                     audio.volume = 0.5;
@@ -631,7 +644,7 @@
             }
         }
 
-        // Suara untuk pesan terkirim (nada lebih rendah, pendek, seperti 'pop')
+        // Suara pesan terkirim (pop pendek)
         function playOutgoingSound() {
             try {
                 initAudio();
@@ -648,7 +661,6 @@
                 osc.start(now);
                 osc.stop(now + 0.08);
             } catch (e) {
-                // Fallback
                 try {
                     const audio = new Audio('data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAABCAAAAAAA=');
                     audio.volume = 0.3;
@@ -846,9 +858,9 @@
 
             renderMessage(key, data, isOwn);
 
-            // Jika pesan dari orang lain dan belum dibaca, mainkan suara masuk
+            // Jika pesan dari orang lain dan belum dibaca, mainkan suara siulan
             if (!isOwn && data.read !== true && !notifiedKeys.has(key)) {
-                playIncomingSound(); // <-- suara pesan masuk
+                playIncomingSound(); // <-- suara siulan
                 notifiedKeys.add(key);
                 messagesRef.child(key).update({ read: true })
                     .catch(err => console.warn('Gagal update read:', err));
@@ -906,7 +918,6 @@
                     // Suara pesan terkirim
                     playOutgoingSound();
 
-                    // Update read setelah 1 detik (simulasi dibaca)
                     setTimeout(() => {
                         newRef.update({ read: true })
                             .catch(err => console.warn('Gagal update read:', err));
@@ -992,7 +1003,7 @@
         });
         observer.observe(container, { childList: true, subtree: true });
 
-        console.log('💬 WA + Suara Masuk & Kirim siap!');
+        console.log('💬 WA + Suara Siulan siap!');
     </script>
 
 </body>
