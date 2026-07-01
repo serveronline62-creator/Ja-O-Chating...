@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>💬 WA Clone + Notifikasi</title>
+    <title>💬 WA Clone + Hapus & Batalkan</title>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js">
@@ -210,9 +210,10 @@
         .message .footer {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             margin-top: 3px;
             padding: 0 4px;
+            flex-wrap: wrap;
         }
         .message .time {
             font-size: 10px;
@@ -227,6 +228,29 @@
             line-height: 1;
         }
         .message.other .check {
+            display: none;
+        }
+        /* Tombol aksi (hapus & batal) */
+        .message .action-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+            color: #7a7a7a;
+            transition: color 0.2s, transform 0.1s;
+        }
+        .message .action-btn:hover {
+            color: #e74c3c;
+        }
+        .message .action-btn:active {
+            transform: scale(0.8);
+        }
+        .message.own .action-btn {
+            display: inline-block;
+        }
+        .message.other .action-btn {
             display: none;
         }
 
@@ -494,7 +518,7 @@
         const emojiPicker = document.getElementById('emojiPicker');
 
         // ============================================================
-        // 3. NOTIFIKASI SUARA (Web Audio)
+        // 3. NOTIFIKASI SUARA
         // ============================================================
         let audioCtx = null;
 
@@ -514,7 +538,6 @@
                 osc.start(audioCtx.currentTime);
                 osc.stop(audioCtx.currentTime + 0.15);
             } catch (e) {
-                // Fallback: gunakan Audio tag jika tersedia
                 try {
                     const audio = new Audio('data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAABCAAAAAAA=');
                     audio.volume = 0.5;
@@ -547,7 +570,7 @@
         }
 
         // ============================================================
-        // 5. RENDER PESAN (dengan centang)
+        // 5. RENDER PESAN (dengan tombol aksi)
         // ============================================================
         function renderMessage(key, data, isOwn) {
             if (emptyState.style.display !== 'none') {
@@ -588,6 +611,47 @@
             footer.appendChild(timeSpan);
             if (isOwn) {
                 footer.appendChild(checkSpan);
+
+                // Tombol hapus (delete for me)
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'action-btn';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.title = 'Hapus (untuk saya)';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('Hapus pesan ini dari tampilan Anda?')) {
+                        // Hanya hapus dari DOM
+                        msgDiv.style.transition = 'opacity 0.2s';
+                        msgDiv.style.opacity = '0';
+                        setTimeout(() => {
+                            msgDiv.remove();
+                            updateEmptyState();
+                        }, 200);
+                    }
+                });
+
+                // Tombol batalkan (unsend for everyone)
+                const unsendBtn = document.createElement('button');
+                unsendBtn.className = 'action-btn';
+                unsendBtn.textContent = '❌';
+                unsendBtn.title = 'Batalkan untuk semua';
+                unsendBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('Batalkan pesan ini untuk semua orang?')) {
+                        // Hapus dari Firebase
+                        messagesRef.child(key).remove()
+                            .then(() => {
+                                // Pesan akan dihapus oleh listener child_removed
+                            })
+                            .catch(err => {
+                                console.error('Gagal batalkan:', err);
+                                alert('Gagal membatalkan pesan.');
+                            });
+                    }
+                });
+
+                footer.appendChild(deleteBtn);
+                footer.appendChild(unsendBtn);
             }
 
             msgDiv.appendChild(senderSpan);
@@ -599,7 +663,7 @@
         }
 
         // ============================================================
-        // 6. UPDATE CENTANG SAAT READ BERUBAH
+        // 6. UPDATE CENTANG
         // ============================================================
         function updateCheckMark(key, read) {
             const msgDiv = container.querySelector(`[data-key="${key}"]`);
@@ -611,29 +675,23 @@
         }
 
         // ============================================================
-        // 7. LISTENER REALTIME (child_added & child_changed)
+        // 7. LISTENER REALTIME
         // ============================================================
         let isInitialLoad = true;
-
-        // Untuk melacak pesan yang sudah diproses notifikasi
         const notifiedKeys = new Set();
 
+        // child_added
         messagesRef.orderByChild('timestamp').limitToLast(100).on('child_added', (snapshot) => {
             const key = snapshot.key;
             const data = snapshot.val();
             const currentUser = sessionStorage.getItem('chat_user') || getSenderName();
             const isOwn = (data.name === currentUser);
 
-            // Render pesan
             renderMessage(key, data, isOwn);
 
-            // Jika pesan dari orang lain dan belum dibaca, mainkan notifikasi dan tandai read
             if (!isOwn && data.read !== true && !notifiedKeys.has(key)) {
-                // Mainkan suara
                 playNotificationSound();
                 notifiedKeys.add(key);
-
-                // Update read menjadi true di Firebase
                 messagesRef.child(key).update({ read: true })
                     .catch(err => console.warn('Gagal update read:', err));
             }
@@ -643,12 +701,26 @@
             }
         });
 
-        // Dengarkan perubahan read
+        // child_changed (untuk update read)
         messagesRef.on('child_changed', (snapshot) => {
             const key = snapshot.key;
             const data = snapshot.val();
             if (data.read !== undefined) {
                 updateCheckMark(key, data.read);
+            }
+        });
+
+        // child_removed (untuk batalkan pesan)
+        messagesRef.on('child_removed', (snapshot) => {
+            const key = snapshot.key;
+            const msgDiv = container.querySelector(`[data-key="${key}"]`);
+            if (msgDiv) {
+                msgDiv.style.transition = 'opacity 0.2s';
+                msgDiv.style.opacity = '0';
+                setTimeout(() => {
+                    msgDiv.remove();
+                    updateEmptyState();
+                }, 200);
             }
         });
 
@@ -666,17 +738,15 @@
             sessionStorage.setItem('chat_user', name);
 
             const newRef = messagesRef.push();
-            const key = newRef.key;
             const payload = {
                 name: name,
                 text: text,
                 timestamp: Date.now(),
-                read: false // awal belum dibaca
+                read: false
             };
 
             newRef.set(payload)
                 .then(() => {
-                    // Setelah berhasil disimpan, update read menjadi true setelah 1 detik (simulasi dibaca)
                     setTimeout(() => {
                         newRef.update({ read: true })
                             .catch(err => console.warn('Gagal update read:', err));
@@ -761,7 +831,7 @@
         });
         observer.observe(container, { childList: true, subtree: true });
 
-        console.log('💬 WA Clone + Notifikasi & Centang siap!');
+        console.log('💬 WA Clone + Hapus & Batalkan siap!');
     </script>
 
 </body>
