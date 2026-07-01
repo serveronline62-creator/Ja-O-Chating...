@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>💬 WA Modern + Hapus & Batalkan</title>
+    <title>💬 WA Minimal + Hapus & Batalkan</title>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js">
@@ -369,19 +369,19 @@
             border-radius: 16px;
         }
 
-        /* ----- CONTEXT MENU (modern) ----- */
+        /* ----- CONTEXT MENU (sangat kecil) ----- */
         .context-menu {
             position: fixed;
             background: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-            padding: 12px 0;
-            min-width: 200px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            padding: 6px 0;
+            min-width: 140px;
             z-index: 1000;
             display: none;
             opacity: 0;
-            transform: scale(0.95);
-            transition: opacity 0.15s, transform 0.15s;
+            transform: scale(0.92);
+            transition: opacity 0.12s, transform 0.12s;
             overflow: hidden;
         }
         .context-menu.show {
@@ -390,28 +390,30 @@
             transform: scale(1);
         }
         .context-menu .menu-item {
-            padding: 12px 20px;
-            font-size: 15px;
+            padding: 6px 14px;
+            font-size: 13px;
             color: #1a1a1a;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             transition: background 0.1s;
             border: none;
             background: transparent;
             width: 100%;
             text-align: left;
             font-family: inherit;
+            letter-spacing: 0.2px;
         }
         .context-menu .menu-item:hover {
-            background: #f0f0f0;
+            background: #f5f5f5;
         }
         .context-menu .menu-item:active {
-            background: #e0e0e0;
+            background: #e8e8e8;
         }
         .context-menu .menu-item .icon {
-            font-size: 20px;
+            font-size: 16px;
+            line-height: 1;
         }
         .context-menu .menu-item.danger {
             color: #e74c3c;
@@ -421,8 +423,8 @@
         }
         .context-menu .divider {
             height: 1px;
-            background: #e0e0e0;
-            margin: 4px 12px;
+            background: #e8e8e8;
+            margin: 3px 10px;
         }
 
         /* Responsive */
@@ -461,11 +463,19 @@
                 height: 240px;
             }
             .context-menu {
-                min-width: 160px;
+                min-width: 120px;
+                padding: 4px 0;
             }
             .context-menu .menu-item {
-                padding: 10px 16px;
+                padding: 5px 12px;
+                font-size: 12px;
+                gap: 6px;
+            }
+            .context-menu .menu-item .icon {
                 font-size: 14px;
+            }
+            .context-menu .divider {
+                margin: 2px 8px;
             }
         }
         @media (max-width: 380px) {
@@ -531,14 +541,14 @@
         </div>
     </div>
 
-    <!-- Context Menu -->
+    <!-- Context Menu (sangat kecil) -->
     <div class="context-menu" id="contextMenu">
         <button class="menu-item" id="menuDelete">
-            <span class="icon">🗑️</span> Hapus untuk saya
+            <span class="icon">🗑️</span> Hapus saya
         </button>
         <div class="divider"></div>
         <button class="menu-item danger" id="menuUnsend">
-            <span class="icon">❌</span> Batalkan untuk semua
+            <span class="icon">❌</span> Batal semua
         </button>
     </div>
 
@@ -638,23 +648,19 @@
             currentMessageKey = key;
             currentMessageElement = element;
 
-            // Posisi menu
             let x = event.clientX || event.touches?.[0]?.clientX || 0;
             let y = event.clientY || event.touches?.[0]?.clientY || 0;
 
-            // Jika tidak ada event (misal dari keyboard) pakai posisi tengah
             if (x === 0 && y === 0) {
                 const rect = element.getBoundingClientRect();
                 x = rect.left + rect.width / 2;
                 y = rect.top + rect.height / 2;
             }
 
-            // Tampilkan menu
             contextMenu.style.left = x + 'px';
             contextMenu.style.top = y + 'px';
             contextMenu.classList.add('show');
 
-            // Pastikan tidak keluar layar
             const menuRect = contextMenu.getBoundingClientRect();
             if (menuRect.right > window.innerWidth) {
                 contextMenu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
@@ -670,10 +676,8 @@
             currentMessageElement = null;
         }
 
-        // Event untuk menu item
         menuDelete.addEventListener('click', () => {
             if (currentMessageKey && currentMessageElement) {
-                // Hapus dari DOM (delete for me)
                 const msgDiv = currentMessageElement;
                 msgDiv.style.transition = 'opacity 0.2s';
                 msgDiv.style.opacity = '0';
@@ -690,7 +694,6 @@
                 if (confirm('Batalkan pesan ini untuk semua orang?')) {
                     messagesRef.child(currentMessageKey).remove()
                         .then(() => {
-                            // Pesan akan dihapus oleh listener child_removed
                             hideContextMenu();
                         })
                         .catch(err => {
@@ -704,7 +707,6 @@
             }
         });
 
-        // Klik di luar menu untuk menutup
         document.addEventListener('click', (e) => {
             if (!contextMenu.contains(e.target)) {
                 hideContextMenu();
@@ -712,7 +714,7 @@
         });
 
         // ============================================================
-        // 6. RENDER PESAN (tanpa tombol aksi)
+        // 6. RENDER PESAN
         // ============================================================
         function renderMessage(key, data, isOwn) {
             if (emptyState.style.display !== 'none') {
@@ -759,16 +761,12 @@
             msgDiv.appendChild(bubble);
             msgDiv.appendChild(footer);
 
-            // Event klik pada bubble (hanya untuk pesan sendiri)
             if (isOwn) {
                 bubble.addEventListener('click', (e) => {
                     e.stopPropagation();
                     showContextMenu(e, key, msgDiv);
                 });
-                // Juga bisa pada seluruh div agar area klik lebih luas
                 msgDiv.addEventListener('click', (e) => {
-                    // Jika klik terjadi pada bubble, sudah ditangani di atas.
-                    // Tapi jika klik di luar bubble (footer, sender) tetap munculkan menu.
                     if (!e.target.closest('.bubble')) {
                         showContextMenu(e, key, msgDiv);
                     }
@@ -945,7 +943,7 @@
         });
         observer.observe(container, { childList: true, subtree: true });
 
-        console.log('💬 WA Modern + Hapus & Batalkan via klik teks siap!');
+        console.log('💬 WA Minimal + menu kecil siap!');
     </script>
 
 </body>
